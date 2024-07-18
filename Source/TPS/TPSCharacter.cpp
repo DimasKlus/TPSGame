@@ -1,5 +1,4 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
-
 #include "TPSCharacter.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Camera/CameraComponent.h"
@@ -10,6 +9,8 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "HeadMountedDisplayFunctionLibrary.h"
 #include "Materials/Material.h"
+#include "Kismet/GameplayStatics.h"
+#include "Kismet/KismetMathLibrary.h"
 #include "Engine/World.h"
 
 ATPSCharacter::ATPSCharacter()
@@ -31,9 +32,9 @@ ATPSCharacter::ATPSCharacter()
 	// Create a camera boom...
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
-	CameraBoom->SetUsingAbsoluteRotation(true); // Don't want arm to rotate when character does
+	CameraBoom->bAbsoluteRotation = true; // Don't want arm to rotate when character does
 	CameraBoom->TargetArmLength = 800.f;
-	CameraBoom->SetRelativeRotation(FRotator(-60.f, 0.f, 0.f));
+	CameraBoom->RelativeRotation = FRotator(-60.f, 0.f, 0.f);
 	CameraBoom->bDoCollisionTest = false; // Don't want to pull camera in when it collides with level
 
 	// Create a camera...
@@ -44,7 +45,7 @@ ATPSCharacter::ATPSCharacter()
 	// Create a decal in the world to show the cursor's location
 	CursorToWorld = CreateDefaultSubobject<UDecalComponent>("CursorToWorld");
 	CursorToWorld->SetupAttachment(RootComponent);
-	static ConstructorHelpers::FObjectFinder<UMaterial> DecalMaterialAsset(TEXT("Material'/Game/Blueprints/Character/M_Cursor_Decal.M_Cursor_Decal'"));
+	static ConstructorHelpers::FObjectFinder<UMaterial> DecalMaterialAsset(TEXT("Material'/Game/Blueprint/Character/M_Cursor_Decal.M_Cursor_Decal'"));
 	if (DecalMaterialAsset.Succeeded())
 	{
 		CursorToWorld->SetDecalMaterial(DecalMaterialAsset.Object);
@@ -59,7 +60,7 @@ ATPSCharacter::ATPSCharacter()
 
 void ATPSCharacter::Tick(float DeltaSeconds)
 {
-    Super::Tick(DeltaSeconds);
+	Super::Tick(DeltaSeconds);
 
 	if (CursorToWorld != nullptr)
 	{
@@ -87,16 +88,16 @@ void ATPSCharacter::Tick(float DeltaSeconds)
 			CursorToWorld->SetWorldRotation(CursorR);
 		}
 	}
+
 	MovementTick(DeltaSeconds);
 }
 
-void ATPSCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
+void ATPSCharacter::SetupPlayerInputComponent(UInputComponent* NewInputComponent)
 {
-	Super::SetupPlayerInputComponent(InputComponent);
-	
-	PlayerInputComponent->BindAxis(TEXT("MoveForward"), this, &ATPSCharacter::InputAxisX);
-	PlayerInputComponent->BindAxis(TEXT("MoveRight"), this, &ATPSCharacter::InputAxisY);
+	Super::SetupPlayerInputComponent(NewInputComponent);
 
+	NewInputComponent->BindAxis(TEXT("MoveForward"), this, &ATPSCharacter::InputAxisX);
+	NewInputComponent->BindAxis(TEXT("MoveRight"), this, &ATPSCharacter::InputAxisY);
 }
 
 void ATPSCharacter::InputAxisY(float Value)
@@ -111,8 +112,18 @@ void ATPSCharacter::InputAxisX(float Value)
 
 void ATPSCharacter::MovementTick(float DeltaTime)
 {
-	AddMovementInput(FVector(1.0f, 0.0f, 0.0f), AxisY);
-	AddMovementInput(FVector(0.0f, 1.0f, 0.0f), AxisX);
+	AddMovementInput(FVector(1.0f, 0.0f, 0.0f), AxisX);
+	AddMovementInput(FVector(0.0f, 1.0f, 0.0f), AxisY);
+
+	APlayerController* myController = UGameplayStatics::GetPlayerController(GetWorld(), 0);
+	if (myController)
+	{
+		FHitResult ResultHit;
+		myController->GetHitResultUnderCursorByChannel(ETraceTypeQuery::TraceTypeQuery6, false, ResultHit);
+
+		float FindRotaterResultYaw = UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), ResultHit.Location).Yaw;
+		SetActorRotation(FQuat(FRotator(0.0f, FindRotaterResultYaw, 0.0f)));
+	}
 }
 
 void ATPSCharacter::CharacterUpdate()
@@ -121,22 +132,59 @@ void ATPSCharacter::CharacterUpdate()
 	switch (MovementState)
 	{
 	case EMovementState::Aim_State:
-		ResSpeed = MovementInfo.AimSpeed;
+		ResSpeed = MovementSpeedInfo.AimSpeedNormal;
+		break;
+	case EMovementState::AimWalk_State:
+		ResSpeed = MovementSpeedInfo.AimSpeedWalk;
 		break;
 	case EMovementState::Walk_State:
-		ResSpeed = MovementInfo.WalkSpeed;
+		ResSpeed = MovementSpeedInfo.WalkSpeedNormal;
 		break;
 	case EMovementState::Run_State:
-		ResSpeed = MovementInfo.RunSpeed;
+		ResSpeed = MovementSpeedInfo.RunSpeedNormal;
+		break;
+	case EMovementState::SprintRun_State:
+		ResSpeed = MovementSpeedInfo.SprintRunSpeedRun;
 		break;
 	default:
 		break;
 	}
+
 	GetCharacterMovement()->MaxWalkSpeed = ResSpeed;
 }
 
-void ATPSCharacter::ChangeMovementState(EMovementState NewMovementState)
+void ATPSCharacter::ChangeMovementState()
 {
-	MovementState = NewMovementState;
+	if (!WalkEnabled && !SprintRunEnabled && !AimEnabled)
+	{
+		MovementState = EMovementState::Run_State;
+	}
+	else
+	{
+		if (SprintRunEnabled)
+		{
+			WalkEnabled = false;
+			AimEnabled = false;
+			MovementState = EMovementState::SprintRun_State;
+		}
+		if (WalkEnabled && !SprintRunEnabled && AimEnabled)
+		{
+			MovementState = EMovementState::AimWalk_State;
+		}
+		else
+		{
+			if (WalkEnabled && !SprintRunEnabled && !AimEnabled)
+			{
+				MovementState = EMovementState::Walk_State;
+			}
+			else
+			{
+				if (!WalkEnabled && !SprintRunEnabled && AimEnabled)
+				{
+					MovementState = EMovementState::Aim_State;
+				}
+			}
+		}
+	}
 	CharacterUpdate();
 }

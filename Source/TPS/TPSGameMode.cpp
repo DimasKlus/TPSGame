@@ -7,7 +7,7 @@
 
 ATPSGameMode::ATPSGameMode()
 {
-	// use our custom PlayerController class
+	/*// use our custom PlayerController class
 	PlayerControllerClass = ATPSPlayerController::StaticClass();
 
 	// set default pawn class to our Blueprinted character
@@ -16,4 +16,4 @@ ATPSGameMode::ATPSGameMode()
 	{
 		DefaultPawnClass = PlayerPawnBPClass.Class;
 	}
-}
+}*/
