@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "KismetBlueprintFunctionLibrary.h"
+
 #include "Types.generated.h"
 
 UENUM(BlueprintType)
@@ -33,7 +33,7 @@ struct FCharacterSpeed
 };
 
 UCLASS()
-class TPS_API UTypes  public UBlueprintFunctionLibrary
+class TPS_API UTypes:  public UBlueprintFunctionLibrary
 {
 	GENERATED_BODY()
 };

@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
-#include "FuncLibrary/Types.h"
+#include "Types.h"
 #include "TPSCharacter.generated.h"
 
 //USTRUCT(BlueprintType)

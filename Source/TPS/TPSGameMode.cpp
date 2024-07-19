@@ -15,5 +15,5 @@ ATPSGameMode::ATPSGameMode()
 	if (PlayerPawnBPClass.Class != nullptr)
 	{
 		DefaultPawnClass = PlayerPawnBPClass.Class;
-	}
-}*/
+	}*/
+}
