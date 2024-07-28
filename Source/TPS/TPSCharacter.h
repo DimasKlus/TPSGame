@@ -59,6 +59,8 @@ public:
 	bool WalkEnabled = false;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
 	bool AimEnabled = false;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
+	bool bCanSprint = false;
 
 	UFUNCTION()
 	void InputAxisY(float Value);
